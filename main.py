@@ -1,13 +1,12 @@
 # from __future__ import print_function
 import argparse
 import torch.utils.data
-from dataloader import *
-from Model import *
+from dataloader import get_dataloader
+import Model
+import Visulaizer
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-from Visulaizer_reform import *
-from torchvision.utils import save_image
-import numpy
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -68,7 +67,7 @@ if __name__ == "__main__":
     train_loader = get_dataloader(opt)
     model = Model(opt)
     model.to(device)
-    tensorboard_viz = Visualizer()
+    tensorboard_viz = Visulaizer.Visualizer()
 
     step = 0
 

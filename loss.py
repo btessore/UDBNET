@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
-from utils_reform import *
-import numpy
+from utils import Denormalization
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -75,7 +74,7 @@ class Style_loss(nn.Module):
 
         # calculating the gram matrix
         deg_img_gram = [gram(i) for i in deg_img_vgg]
-        gen_img_gram = [gram(l) for l in gen_img_vgg]
+        gen_img_gram = [gram(li) for li in gen_img_vgg]
 
         # calculating the loss
         loss = 0

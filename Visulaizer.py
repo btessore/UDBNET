@@ -1,11 +1,10 @@
-import numpy
 import torch
 import torchvision
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 from torch.utils.tensorboard import SummaryWriter
 import os
 import shutil
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class Visualizer:
