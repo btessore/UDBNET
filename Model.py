@@ -1,9 +1,10 @@
-from Network_reform import *
+import Network
 import torch
 import torch.nn as nn
 from collections import OrderedDict
-from loss_reform import *
-
+import loss
+import os
+import torchvision
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -12,11 +13,11 @@ class Model(nn.Module):
     def __init__(self, opt):
         super(Model, self).__init__()
         self.opt = opt
-        self.Texture_generator = Texture_Generator_and_context_encoder()
-        self.Texture_Discrimator = Texture_Discriminator()
-        self.Binarization_generator = Binarization_Generator()
-        self.Binarization_Discrimator = Binarization_Discriminator()
-        self.joint_discriminator = Joint_Discriminator()
+        self.Texture_generator = Network.Texture_Generator_and_context_encoder()
+        self.Texture_Discrimator = Network.Texture_Discriminator()
+        self.Binarization_generator = Network.Binarization_Generator()
+        self.Binarization_Discrimator = Network.Binarization_Discriminator()
+        self.joint_discriminator = Network.Joint_Discriminator()
 
         self.FloatTensor = torch.cuda.FloatTensor
 
@@ -28,9 +29,9 @@ class Model(nn.Module):
             self.joint_discriminator,
         ) = self.initialize_networks(opt)
 
-        self.style_loss = Style_loss(self.FloatTensor)
-        self.ContentLoss = ContentLoss(self.FloatTensor)
-        self.GanLoss = GanLoss(tensor=self.FloatTensor)
+        self.style_loss = loss.Style_loss(self.FloatTensor)
+        self.ContentLoss = loss.ContentLoss(self.FloatTensor)
+        self.GanLoss = loss.GanLoss(tensor=self.FloatTensor)
         self.criterionFeat = torch.nn.L1Loss()
         (
             self.optimizer_G_texture,
@@ -41,13 +42,13 @@ class Model(nn.Module):
         ) = self.create_optimizers(opt)
 
     def initialize_networks(self, opt):
-        self.Texture_generator.apply(weights_init_normal).to(device)
-        self.Texture_Discrimator.apply(weights_init_normal).to(device)
+        self.Texture_generator.apply(Network.weights_init_normal).to(device)
+        self.Texture_Discrimator.apply(Network.weights_init_normal).to(device)
 
-        self.Binarization_generator.apply(weights_init_normal).to(device)
-        self.Binarization_Discrimator.apply(weights_init_normal).to(device)
+        self.Binarization_generator.apply(Network.weights_init_normal).to(device)
+        self.Binarization_Discrimator.apply(Network.weights_init_normal).to(device)
 
-        self.joint_discriminator.apply(weights_init_normal).to(device)
+        self.joint_discriminator.apply(Network.weights_init_normal).to(device)
 
         return (
             self.Texture_generator,
