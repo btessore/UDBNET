@@ -3,7 +3,7 @@ import argparse
 import torch.utils.data
 from dataloader import get_dataloader
 import Model
-import Visulaizer
+# import Visulaizer
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     train_loader = get_dataloader(opt)
     model = Model(opt)
     model.to(device)
-    tensorboard_viz = Visulaizer.Visualizer()
+    tensorboard_viz = None  # Visulaizer.Visualizer()
 
     step = 0
 
@@ -81,7 +81,8 @@ if __name__ == "__main__":
 
             if (step + 1) % opt.print_freq_iter == 0:
                 img = model.img_list_after_texture()
-                tensorboard_viz.vis_image(img, step)
+                if tensorboard_viz:
+                    tensorboard_viz.vis_image(img, step)
                 print(
                     "Epoch: {}, Iter: {}, Steps: {}, Loss:{}".format(
                         epochs, i_batch, step, errors
@@ -113,7 +114,8 @@ if __name__ == "__main__":
 
             if (steps + 1) % opt.print_freq_iter == 0:
                 img = model.img_list_after_bin()
-                tensorboard_viz.vis_image(img, step)
+                if tensorboard_viz:
+                    tensorboard_viz.vis_image(img, step)
                 print(
                     "Epoch: {}, Iter: {}, Steps: {}, Loss:{}".format(
                         epoch, i_batch_bin, step, error_bin
@@ -139,7 +141,8 @@ if __name__ == "__main__":
 
             if (step + 1) % opt.print_freq_iter == 0:
                 img = model.img_list_after_texture()
-                tensorboard_viz.vis_image(img, step)
+                if tensorboard_viz:
+                    tensorboard_viz.vis_image(img, step)
                 print(
                     "Epoch: {}, Iter: {}, Steps: {}, Loss:{}".format(
                         epoch, i_batch_bin, step, error_bin
