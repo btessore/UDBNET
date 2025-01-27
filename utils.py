@@ -1,10 +1,8 @@
 import torch
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 class Denormalization:
-    def __init__(self):
+    def __init__(self, device="cpu"):
         self.mean_3 = torch.tensor([-1.0, -1.0, -1.0]).to(device)
         self.std_3 = torch.tensor([1 / 0.5, 1 / 0.5, 1 / 0.5]).to(device)
         self.mean_1 = torch.tensor([-1.0]).to(device)

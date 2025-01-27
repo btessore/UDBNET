@@ -11,13 +11,30 @@ def weights_init_normal(m):
         torch.nn.init.constant_(m.bias.data, 0.0)
 
 
-class UNetDown(nn.Module):
+class SimpleAE(nn.Module):
+    def __init__(self, in_chan=1, out_chan=1):
+        super().__init__()
+
+        self.conv_inout = nn.Sequential(
+            nn.Conv2d(in_chan, out_chan, kernel_size=(3, 3), padding="same"), nn.Tanh()
+        )
+
+    def forward(self, x, noisy=None):
+        print(self.conv_inout[0].weight.shape, self.conv_inout[0].weight._version)
+        # x = self.conv_inout(x)
+        x = nn.functional.conv2d(x, self.conv_inout[0].weight, padding="same")
+        x = self.conv_inout[1](x)
+        print(self.conv_inout[0].weight.shape, self.conv_inout[0].weight._version)
+        return x
+
+
+class original_UNetDown(nn.Module):
     def __init__(self, in_size, out_size, normalize=True, dropout=0.0):
-        super(UNetDown, self).__init__()
+        super(original_UNetDown, self).__init__()
         layers = [nn.Conv2d(in_size, out_size, 4, 2, 1, bias=False)]
         if normalize:
             layers.append(nn.InstanceNorm2d(out_size))
-        layers.append(nn.LeakyReLU(0.2, inplace=True))
+        layers.append(nn.LeakyReLU(0.2, inplace=False))
         if dropout:
             layers.append(nn.Dropout(dropout))
         self.model = nn.Sequential(*layers)
@@ -26,13 +43,36 @@ class UNetDown(nn.Module):
         return self.model(x)
 
 
-class UNetUp(nn.Module):
+class UNetDown(nn.Module):
+    def __init__(self, in_size, out_size, normalize=True, dropout=0.0):
+        super(UNetDown, self).__init__()
+        self.conv = nn.Conv2d(in_size, out_size, 4, 2, 1, bias=False)
+        self.norm = None
+        if normalize:
+            self.norm = nn.InstanceNorm2d(out_size)
+        self.act = nn.LeakyReLU(0.2)
+        self.drop = None
+        if dropout:
+            self.drop = nn.Dropout(dropout)
+
+    def forward(self, x):
+        out = self.conv(x)
+        if self.norm:
+            out = self.norm(out)
+        out = self.act(out)
+        if self.drop:
+            out = self.drop(out)
+
+        return out
+
+
+class original_UNetUp(nn.Module):
     def __init__(self, in_size, out_size, dropout=0.0):
-        super(UNetUp, self).__init__()
+        super(original_UNetUp, self).__init__()
         layers = [
             nn.ConvTranspose2d(in_size, out_size, 4, 2, 1, bias=False),
             nn.InstanceNorm2d(out_size),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=False),
         ]
         if dropout:
             layers.append(nn.Dropout(dropout))
@@ -46,11 +86,31 @@ class UNetUp(nn.Module):
         return x
 
 
+class UNetUp(nn.Module):
+    def __init__(self, in_size, out_size, dropout=0.0):
+        super(UNetUp, self).__init__()
+        self.convT = nn.ConvTranspose2d(in_size, out_size, 4, 2, 1, bias=False)
+        self.norm = nn.InstanceNorm2d(out_size)
+        self.act = nn.ReLU()
+        self.drop = None
+        if dropout:
+            self.drop = nn.Dropout(dropout)
+
+    def forward(self, x, skip_input):
+        out = self.convT(x)
+        out = self.norm(out)
+        out = self.act(out)
+        if self.drop:
+            out = self.drop(out)
+        out = torch.cat((out, skip_input), 1)
+        return out
+
+
 class style_encoder(nn.Module):
     def __init__(self, in_channels=3):
         super(style_encoder, self).__init__()
 
-        self.down1 = UNetDown(3, 32, normalize=False)
+        self.down1 = UNetDown(in_channels, 32, normalize=False)
         self.down2 = UNetDown(32, 64)
         self.down3 = UNetDown(64, 128)
         self.down4 = UNetDown(128, 256, dropout=0.5)
@@ -61,22 +121,29 @@ class style_encoder(nn.Module):
 
     def forward(self, x):
         # U-Net generator with skip connections from encoder to decoder
-        d1 = self.down1(x)
-        d2 = self.down2(d1)
-        d3 = self.down3(d2)
-        d4 = self.down4(d3)
-        d5 = self.down5(d4)
-        d6 = self.down6(d5)
-        d7 = self.down7(d6)
-        d8 = self.down8(d7)
-        return d8
+        # d1 = self.down1(x)
+        # d2 = self.down2(d1)
+        # d3 = self.down3(d2)
+        # d4 = self.down4(d3)
+        # d5 = self.down5(d4)
+        # d6 = self.down6(d5)
+        # d7 = self.down7(d6)
+        # d8 = self.down8(d7)
+        # return d8
+        return self.down8(
+            self.down7(
+                self.down6(
+                    self.down5(self.down4(self.down3(self.down2(self.down1(x)))))
+                )
+            )
+        )
 
 
 class Texture_Generator_and_context_encoder(nn.Module):
     def __init__(self, in_channels=3, out_channels=3):
         super(Texture_Generator_and_context_encoder, self).__init__()
 
-        self.style_encoder = style_encoder(in_channels=3)
+        self.style_encoder = style_encoder(in_channels=in_channels)
 
         self.down1 = UNetDown(in_channels, 32, normalize=False)
         self.down2 = UNetDown(32, 64)
@@ -128,6 +195,10 @@ class Texture_Generator_and_context_encoder(nn.Module):
         u6 = self.up6(u5, d2)
         u7 = self.up7(u6, d1)
 
+        # u7 = self.final(u7)
+        # u7 = nn.functional.conv2d(
+        #     u7, self.conv.weight.clone(), self.conv.bias, padding=1
+        # )
         return self.final(u7)
 
 
@@ -140,7 +211,7 @@ class Texture_Discriminator(nn.Module):
             layers = [nn.Conv2d(in_filters, out_filters, 4, stride=2, padding=1)]
             if normalization:
                 layers.append(nn.InstanceNorm2d(out_filters))
-            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            layers.append(nn.LeakyReLU(0.2, inplace=False))
             return layers
 
         self.model = nn.Sequential(
@@ -181,7 +252,7 @@ class Binarization_Generator(nn.Module):
         self.final = nn.Sequential(
             nn.Upsample(scale_factor=2),
             nn.ZeroPad2d((1, 0, 1, 0)),
-            nn.Conv2d(128, 3, 4, padding=1),
+            nn.Conv2d(128, out_channels, 4, padding=1),
             nn.Tanh(),
         )
 
@@ -214,7 +285,7 @@ class Binarization_Discriminator(nn.Module):
             layers = [nn.Conv2d(in_filters, out_filters, 4, stride=2, padding=1)]
             if normalization:
                 layers.append(nn.InstanceNorm2d(out_filters))
-            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            layers.append(nn.LeakyReLU(0.2, inplace=False))
             return layers
 
         self.model = nn.Sequential(
@@ -243,7 +314,7 @@ class Joint_Discriminator(nn.Module):
             layers = [nn.Conv2d(in_filters, out_filters, 4, stride=2, padding=1)]
             if normalization:
                 layers.append(nn.InstanceNorm2d(out_filters))
-            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            layers.append(nn.LeakyReLU(0.2, inplace=False))
             return layers
 
         self.model = nn.Sequential(

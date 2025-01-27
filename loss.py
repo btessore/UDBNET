@@ -4,7 +4,19 @@ import torch.nn.functional as F
 from torchvision import models
 from utils import Denormalization
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+class MSE(nn.Module):
+    def __init__(self, device="cpu"):
+        super().__init__()
+
+        self.de_re_norm = Denormalization(device=device)
+        self.loss = nn.MSELoss()
+
+    def forward(self, deg_img, gen_img):
+        deg_img_norm = self.de_re_norm(deg_img)
+        gen_img_norm = self.de_re_norm(gen_img)
+
+        return self.loss(deg_img_norm, gen_img_norm)
 
 
 class Vgg16(nn.Module):
@@ -32,6 +44,10 @@ class Vgg16(nn.Module):
             param.requires_grad = False
 
     def forward(self, x):
+        b, ch, *_ = x.shape
+        if ch == 1:
+            print("here xx")
+            x = x.repeat(1, 3, 1, 1)
         h = self.to_relu_1_2(x)
         h_relu_1_2 = h
         h = self.to_relu_2_2(h)
@@ -55,11 +71,11 @@ def gram(x):
 
 
 class Style_loss(nn.Module):
-    def __init__(self, dtype):
+    def __init__(self, dtype, device="cpu"):
         super(Style_loss, self).__init__()
-        self.de_re_norm = Denormalization()
+        self.de_re_norm = Denormalization(device=device)
         self.loss = nn.MSELoss()
-        self.vgg16 = Vgg16().to(device)
+        self.vgg16 = Vgg16()
         self.dtype = dtype
         self.STYLE_WEIGHT = 0.5
 
@@ -112,17 +128,21 @@ class GanLoss(nn.Module):
         self.real_label_tensor = None
         self.fake_label_tensor = None
         self.opt = opt
-        self.Tensor = tensor
+        # self.Tensor = tensor
 
     def get_target_tensor(self, input, target_is_real):
         if target_is_real:
             if self.real_label_tensor is None:
-                self.real_label_tensor = self.Tensor(1).fill_(self.real_label)
+                self.real_label_tensor = torch.tensor(self.real_label).to(
+                    input.device
+                )  # self.Tensor(1).fill_(self.real_label)
                 self.real_label_tensor.requires_grad_(False)
             return self.real_label_tensor.expand_as(input)
         else:
             if self.fake_label_tensor is None:
-                self.fake_label_tensor = self.Tensor(1).fill_(self.fake_label)
+                self.fake_label_tensor = torch.tensor(self.fake_label).to(
+                    input.device
+                )  # self.Tensor(1).fill_(self.fake_label)
                 self.fake_label_tensor.requires_grad_(False)
             return self.fake_label_tensor.expand_as(input)
 

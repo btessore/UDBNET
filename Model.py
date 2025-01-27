@@ -6,31 +6,46 @@ import loss
 import os
 import torchvision
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 class Model(nn.Module):
     def __init__(self, opt):
         super(Model, self).__init__()
         self.opt = opt
-        self.Texture_generator = Network.Texture_Generator_and_context_encoder()
-        self.Texture_Discrimator = Network.Texture_Discriminator()
-        self.Binarization_generator = Network.Binarization_Generator()
-        self.Binarization_Discrimator = Network.Binarization_Discriminator()
-        self.joint_discriminator = Network.Joint_Discriminator()
+        # self.Texture_generator = Network.Texture_Generator_and_context_encoder(
+        #     in_channels=opt.in_chan, out_channels=opt.out_chan
+        # )
+        self.Texture_generator = Network.SimpleAE()
+        self.Texture_Discrimator = Network.Texture_Discriminator(
+            in_channels=opt.in_chan
+        )
+        # self.Binarization_generator = Network.Binarization_Generator(
+        #     in_channels=opt.in_chan, out_channels=opt.out_chan
+        # )
+        self.Binarization_generator = Network.SimpleAE()
+        self.Binarization_Discrimator = Network.Binarization_Discriminator(
+            in_channels=opt.in_chan
+        )
+        self.joint_discriminator = Network.Joint_Discriminator(in_channels=opt.in_chan)
 
-        self.FloatTensor = torch.cuda.FloatTensor
+        self.FloatTensor = (
+            torch.cuda.FloatTensor if opt.device != "cpu" else torch.FloatTensor
+        )
 
-        (
-            self.Texture_generator,
-            self.Texture_Discrimator,
-            self.Binarization_generator,
-            self.Binarization_Discrimator,
-            self.joint_discriminator,
-        ) = self.initialize_networks(opt)
+        # me
+        # (
+        #     self.Texture_generator,
+        #     self.Texture_Discrimator,
+        #     self.Binarization_generator,
+        #     self.Binarization_Discrimator,
+        #     self.joint_discriminator,
+        # ) = self.initialize_networks(opt)
 
-        self.style_loss = loss.Style_loss(self.FloatTensor)
-        self.ContentLoss = loss.ContentLoss(self.FloatTensor)
+        # me
+        # self.style_loss = loss.Style_loss(self.FloatTensor, device=opt.device)
+        # self.ContentLoss = loss.ContentLoss(self.FloatTensor)
+        # for debug use a faster simpler (less adapted) loss
+        self.style_loss = loss.MSE(device=opt.device)
+        self.ContentLoss = loss.MSE()
         self.GanLoss = loss.GanLoss(tensor=self.FloatTensor)
         self.criterionFeat = torch.nn.L1Loss()
         (
@@ -42,13 +57,13 @@ class Model(nn.Module):
         ) = self.create_optimizers(opt)
 
     def initialize_networks(self, opt):
-        self.Texture_generator.apply(Network.weights_init_normal).to(device)
-        self.Texture_Discrimator.apply(Network.weights_init_normal).to(device)
+        self.Texture_generator.apply(Network.weights_init_normal)  # .to(device)
+        self.Texture_Discrimator.apply(Network.weights_init_normal)  # .to(device)
 
-        self.Binarization_generator.apply(Network.weights_init_normal).to(device)
-        self.Binarization_Discrimator.apply(Network.weights_init_normal).to(device)
+        self.Binarization_generator.apply(Network.weights_init_normal)  # .to(device)
+        self.Binarization_Discrimator.apply(Network.weights_init_normal)  # .to(device)
 
-        self.joint_discriminator.apply(Network.weights_init_normal).to(device)
+        self.joint_discriminator.apply(Network.weights_init_normal)  # .to(device)
 
         return (
             self.Texture_generator,
@@ -234,7 +249,10 @@ class Model(nn.Module):
 
         self.G_losses_bin = G_losses_bin
         G_losses_bin_ = sum(G_losses_bin.values()).mean()
+        print("toto")
+        print(G_losses_bin_)
         G_losses_bin_.backward(retain_graph=True)
+        print("totob")
         self.optimizer_G_bin.step()
 
         D_losses_bin = {}
@@ -305,8 +323,8 @@ class Model(nn.Module):
     def test_base(self, test_data):
         i = 0
         for i_batch, (clean_img, degraded_img) in enumerate(test_data):
-            clean_img = clean_img.to(device)
-            degraded_img = degraded_img.to(device)
+            clean_img = clean_img.to(self.opt.device)
+            degraded_img = degraded_img.to(self.opt.device)
             clean_bin_img = self.Binarization_generator(degraded_img)
             if not os.path.exists("./predicted_images_base_model/"):
                 os.makedirs("./predicted_images_base_model/")
@@ -334,8 +352,8 @@ class Model(nn.Module):
     def test_ours(self, test_data):
         i = 0
         for i_batch, (clean_img, degraded_img) in enumerate(test_data):
-            clean_img = clean_img.to(device)
-            degraded_img = degraded_img.to(device)
+            clean_img = clean_img.to(self.opt.device)
+            degraded_img = degraded_img.to(self.opt.device)
             clean_bin_img = self.Binarization_generator(degraded_img)
             if not os.path.exists("./predicted_images_ours/"):
                 os.makedirs("./predicted_images_ours/")
